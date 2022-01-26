@@ -1,0 +1,121 @@
+---
+title: 'Case Study: How Can a Wellness Technology Company Play It Smart?'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, echo=FALSE,  include=FALSE}
+#install.packages("tidyverse")
+#install.packages("lubridate")
+#install.packages("knitr")
+#install.packages("kableExtra")
+
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+
+dailyCalories_merged <- read_csv("Fitabase Data 4.12.16-5.12.16/dailyCalories_merged.csv")
+
+hourlyCalories_merged <- read_csv("Fitabase Data 4.12.16-5.12.16/hourlyCalories_merged.csv")
+
+```
+
+## Overview
+
+The objective of this analysis is to look at the current trends of smart device usage and how these trends can apply to Bellabeat customers. The data set we will be using will be a data set containing personal tracker data, including minute-level output for physical activity,heart rate and sleep monitoring, from thirty fitbit users. 
+
+### Limitations
+
+[Data Set](https://www.kaggle.com/arashnic/fitbit)
+
+The data set has a small subject group of 30 Fitbit users, focusing on their personal tracker data over the course of 2 months in 2016. Due to the small subject group, the data may not be representative of Bellabeat users. Furthermore, due to the focus on their health data, it may not portray a clear idea of the users personal usage of their devices.
+
+## Preparation and Analysis
+
+Throughout the preparation and analysis of our data set, we will be focusing on 3 questions: 
+
+1. What type of users use these smart devices?
+2. When and how often do these users engage in physical activities over the course of a day?
+3. Do these users alter their behavior over the course of their usage of these smart devices?
+
+With the abovementioned questions in mind, we will be focusing 2 keys data sets, dailyCalories_merged.csv and hourlyCalories_merged.csv.
+
+
+### Active Users
+First, we will be looking at the kind of users who use smart devices. According to the U.S. Department of Health and Human Service, the average woman expands rough;y 1,600 to 2,400 calories per day. We, thus, consider any day with over 2,400 calories expended to be an active day.
+
+```{r calories}
+dailyCalories <- subset(dailyCalories_merged,Calories>500)
+
+days_active <- dailyCalories %>% 
+  group_by(Id) %>% 
+  summarise(is_active = sum(Calories >2400), days_recorded = sum(Calories>0))
+
+days_active <- subset(days_active,days_recorded > 15)
+
+
+kable(days_active)
+```
+
+Of the subject group, 12 spend more than half of the recorded days having some form of exercise, while 15 did not have any form of exercise in more than 5 days. This shows that while some of these smart device users track their frequent physical activities, there is also a significant proportion of the users who use them to track their normal daily lifestyle.
+
+
+### Daily Activities
+
+Next. we look at how the average user spend their day. Going on the average calories spent per hour depending on activities, we assume: 1. Sleep: < 80 calories per hour
+2. Normal: >=80, < 150 calories per hour
+3. Moderate exercise: >=150, < 400 calories per hour
+4. Intense exercise: >= 400 calories per hour
+
+
+```{r daily}
+hourlyCalories <- hourlyCalories_merged
+hourlyCalories$ActivityHour <- mdy_hms(hourlyCalories$ActivityHour)
+hourlyCalories$date <- date(hourlyCalories$ActivityHour)
+hourlyCalories$hour <- hour(hourlyCalories$ActivityHour)
+
+
+hourlyCalories$activity <- ifelse(hourlyCalories$Calories < 80, "sleep",
+                            ifelse ( (hourlyCalories$Calories >=80 & hourlyCalories$Calories < 150), "normal",
+                              ifelse ((hourlyCalories$Calories >=150 & hourlyCalories$Calories < 400), "moderate_exercise", "intense_exercise")))
+
+usage <- count(hourlyCalories, vars= hour)
+
+activity <- hourlyCalories %>% 
+  group_by(hour) %>% 
+  summarise(count_sleep = sum(activity == "sleep"), count_normal = sum(activity == "normal"), count_moderate_exercise = sum(activity == "moderate_exercise"), count_intense_exercise = sum(activity=="intense_exercise"))
+
+activity_sorted_long <- 
+  activity %>% 
+  gather(c("count_normal","count_moderate_exercise","count_intense_exercise"),key="Activity",value="Count")
+
+ggplot(data = activity_sorted_long, aes (x = hour, y = Count, colour = Activity)) +
+  geom_line()
+
+```
+
+Following the above data, this further reinforces the theory that the Fitbit devices is used mostly to track relatively sedentary to light activities rather than very active activities.
+
+### Significant Usage of Fitbit data
+
+Finally, we try to look at whether the users change their habits over the course of their smart device usage. We do this by tracking their daily calories usage and observing whether they change over time.
+
+```{r usage changes}
+ggplot(data = dailyCalories, aes (x = ActivityDay, y = Calories, colour = (factor(Id)), group = 33)) +
+  theme(axis.text.x=element_blank()) +
+  geom_point() + geom_smooth()
+```
+
+We can tell there is little to no significant change in their habits over the average period of 30 days for each test subject.
+
+## Conclusion and Recommendations
+
+While Fitbit advertises itself as a fitness product, we can tell that usage of these devices by the users do not focus primarily on fitness with less than half of the users participating in above moderate activities. Furthermore, the daily activities of the users are mostly sedentary in nature and few change their lifestyle significant based on the Fitbit data provided. As such, most users do not wear these devices to improve to a healthy lifestyle.
+
+With these in mind, I would like to put forward the following recommendations:
+
+1. Marketing for Bellabeat devices should be marketed as a fashion piece or statement with a secondary benefit of tracking health indicators to promote a self-confident, self-sufficient and independent lifestyle rather than a fitness or healthy lifestyle. The focus should be only "Taking good care and pampering yourself" rather than "Staying healthy".
+
+2. The Bellabeat app should focus on social aspects of the users lifestyles and provide minor goals or recommendations to improve their wellness. The app can focus on what the users have done well and allow them to publish these successes on their social media to allow them to portray their excellent usage of the Bellabeat device and an exemplary social media image of themselves.
